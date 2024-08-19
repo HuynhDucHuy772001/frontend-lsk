@@ -6,6 +6,7 @@ import CreateEvent from './page/events/CreateEvent.js';
 import EditEvent from './page/events/EditEvent.js'
 
 function App() {
+  document.title = "Lịch Sự Kiện"
   return (
     <BrowserRouter>
       <Routes>

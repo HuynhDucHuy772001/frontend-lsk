@@ -14,7 +14,15 @@
     -webkit-box-orient: vertical;
     overflow: hidden;
     text-overflow: ellipsis;
-    height: 250px; /* Chiều cao tối đa của ô */
+    height: auto; /* Chiều cao tối đa của ô */
     overflow-y: scroll; /* Tạo thanh cuộn dọc */
+}
+/* style.css */
+.modal-dialog {
+    max-width: 800px; /* Điều chỉnh kích thước chiều rộng tối đa */
+}
+
+.modal-content {
+    width: 100%; /* Chiều rộng của nội dung modal */
 }
 

@@ -3,45 +3,96 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
-import { format, parse } from 'date-fns';
+import { format, parse, isValid } from 'date-fns';
 import './style.css'
 
 export default function EditEvent({ showModal, handleClose, eventId }) {
     const [value, setValue] = useState({
-        duong_dan_hinh_anh: "",
         ten_su_kien: "",
+        ngay_dien_ra_su_kien: "",
         thoi_gian_dien_ra_su_kien: "",
-        dia_diem: "",
-        loai_su_kien: "",
-        mo_ta: ""
+        dia_diem: {
+            dia_chi: "",
+            link_ban_do: ""
+        },
+        gia_ve: {
+            loai_gia_ve: "Miễn phí",
+            so_tien: 0
+        },
+        hinh_anh: "",
+        clip_gioi_thieu: "",
+        linh_vuc: "",
+        bai_viet: "",
+        nguon: "",
+        don_vi_to_chuc: {
+            logo: "",
+            ten: "",
+            thong_tin_lien_he: {
+                sdt: "",
+                website: ""
+            }
+        }
     });
+
+    const [ticketType, setTicketType] = useState('Miễn phí');
     const [loading, setLoading] = useState(true);
     const [selectedDate, setSelectedDate] = useState(null);
 
     const navigate = useNavigate();
 
     useEffect(() => {
+        // Cập nhật ticketType dựa trên loại giá vé trong value khi dữ liệu được tải lên
+        setTicketType(value.gia_ve.loai_gia_ve);
+    }, [value.gia_ve.loai_gia_ve]);
+
+    useEffect(() => {
         if (!eventId) return;
         async function fetchEvent() {
             try {
-                const response = await axios.get(`https://web-lichsukien.onrender.com/api/get/${eventId}`); // Lấy dữ liệu của sự kiện với ID tương ứng
+                const response = await axios.get(`https://web-lichsukien.onrender.com/api/get/${eventId}`);
                 const event = response.data.event;
+                console.log(event);
 
                 // Chuyển đổi thời gian diễn ra sự kiện thành đối tượng Date
-                const eventDate = parse(event.thoi_gian_dien_ra_su_kien, 'dd/MM/yyyy', new Date());
+                const eventDate = parse(event.ngay_dien_ra_su_kien, "yyyy-MM-dd'T'HH:mm:ss.SSSXXX", new Date());
+                if (isValid(eventDate)) {
+                    console.log(eventDate);
+                    setSelectedDate(eventDate);
+                } else {
+                    console.error('Invalid event date:', event.ngay_dien_ra_su_kien);
+                }
 
                 setValue({
-                    duong_dan_hinh_anh: event.duong_dan_hinh_anh,
                     ten_su_kien: event.ten_su_kien,
-                    thoi_gian_dien_ra_su_kien: format(eventDate, 'dd/MM/yyyy'), // Định dạng ngày khi gán vào state
-                    dia_diem: event.dia_diem,
-                    loai_su_kien: event.loai_su_kien,
-                    mo_ta: event.mo_ta
+                    ngay_dien_ra_su_kien: isValid(eventDate) ? format(eventDate, 'dd/MM/yyyy') : "",
+                    thoi_gian_dien_ra_su_kien: event.thoi_gian_dien_ra_su_kien || "",
+                    dia_diem: {
+                        dia_chi: event?.dia_diem?.dia_chi || "",
+                        link_ban_do: event?.dia_diem?.link_ban_do || ""
+                    },
+                    gia_ve: {
+                        loai_gia_ve: event?.gia_ve?.loai_gia_ve || "Miễn phí",
+                        so_tien: event?.gia_ve?.so_tien || 0
+                    },
+                    hinh_anh: event.hinh_anh || "",
+                    clip_gioi_thieu: event.clip_gioi_thieu || "",
+                    linh_vuc: event.linh_vuc || "",
+                    bai_viet: event.bai_viet || "",
+                    nguon: event.nguon || "",
+                    don_vi_to_chuc: {
+                        logo: event?.don_vi_to_chuc?.logo || "",
+                        ten: event?.don_vi_to_chuc?.ten || "",
+                        thong_tin_lien_he: {
+                            sdt: event?.don_vi_to_chuc?.thong_tin_lien_he?.sdt || "",
+                            website: event?.don_vi_to_chuc?.thong_tin_lien_he?.website || ""
+                        }
+                    }
                 });
-                setSelectedDate(eventDate);
+
                 setLoading(false);
             } catch (error) {
                 console.log(error);
+                setLoading(false);
             }
         }
 
@@ -49,34 +100,71 @@ export default function EditEvent({ showModal, handleClose, eventId }) {
     }, [eventId]);
 
     const handleChange = (e) => {
-        setValue({
-            ...value,
-            [e.target.name]: e.target.value
-        });
+        const { name, value } = e.target;
+        const keys = name.split('.');
+        if (keys.length === 1) {
+            setValue(prevState => ({ ...prevState, [name]: value }));
+        } else if (keys.length === 2) {
+            setValue(prevState => ({
+                ...prevState,
+                [keys[0]]: {
+                    ...prevState[keys[0]],
+                    [keys[1]]: value
+                }
+            }));
+        } else if (keys.length === 3) {
+            setValue(prevState => ({
+                ...prevState,
+                [keys[0]]: {
+                    ...prevState[keys[0]],
+                    [keys[1]]: {
+                        ...prevState[keys[0]][keys[1]],
+                        [keys[2]]: value
+                    }
+                }
+            }));
+        }
     };
 
-    const handleDateChange = (date) => {
-        setSelectedDate(date);
-        setValue({
-            ...value,
-            thoi_gian_dien_ra_su_kien: format(date, 'dd/MM/yyyy') // Cập nhật định dạng ngày trong state
-        });
-    };
+    const handleTicketTypeChange = (event) => {
+        const newTicketType = event.target.value;
+        setTicketType(newTicketType);
+        if (newTicketType === 'Miễn phí') {
+            setValue(prevState => ({
+                ...prevState,
+                gia_ve: {
+                    loai_gia_ve: 'Miễn phí',
+                    so_tien: 0
+                }
+            }));
+        } else {
+            setValue(prevState => ({
+                ...prevState,
+                gia_ve: {
+                    loai_gia_ve: 'Có phí',
+                    so_tien: prevState.gia_ve.so_tien || 0
+                }
+            }));
+        }
+    }
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-
-        // Kiểm tra các trường không được để trống
-        if (!value.duong_dan_hinh_anh || !value.ten_su_kien || !value.dia_diem || !value.thoi_gian_dien_ra_su_kien) {
-            alert('Vui lòng điền tất cả các trường.');
-            return;
-        }
+        const formattedDate = selectedDate ? format(selectedDate, "yyyy-MM-dd'T'HH:mm:ss.SSSXXX") : "";
+        const updatedValue = {
+            ...value,
+            gia_ve: {
+                loai_gia_ve: ticketType,
+                so_tien: ticketType === 'Có phí' ? value.gia_ve.so_tien || 0 : 0
+            },
+            ngay_dien_ra_su_kien: formattedDate
+        };
 
         try {
-            const response = await axios.put(`https://web-lichsukien.onrender.com/api/update/${eventId}`, value);
+            const response = await axios.put(`https://web-lichsukien.onrender.com/api/update/${eventId}`, updatedValue);
             if (response.data.success) {
                 alert(response.data.message);
-                navigate('/'); // Chuyển hướng về trang danh sách sự kiện
+                navigate('/');
                 handleClose();
             }
         } catch (error) {
@@ -108,87 +196,132 @@ export default function EditEvent({ showModal, handleClose, eventId }) {
                             <form onSubmit={handleSubmit}>
 
                                 <div className='row mb-3'>
-                                    <div className='col-sm-12 text-center'>
-                                        <img src={value.duong_dan_hinh_anh} alt="" style={{ maxHeight: '100px', }} className='mt-3' />
+                                    <label className='col-sm-4 col-form-label'>Đường dẫn hình ảnh<label style={{ color: 'red' }}>*</label></label>
+                                    <div className='col-sm-8'>
+                                        <input className='form-control' name='hinh_anh' onChange={handleChange} value={value.hinh_anh} />
                                     </div>
                                 </div>
 
-                                <div className='form-group mt-2'>
-                                    <label>Đường dẫn hình ảnh</label>
-                                    <div>
-                                        <input
-                                            className='form-control mt-2'
-                                            name='duong_dan_hinh_anh'
-                                            onChange={handleChange}
-                                            value={value.duong_dan_hinh_anh}
-                                        />
+                                <div className='row mb-3'>
+                                    <label className='col-sm-4 col-form-label'>Link clip giới thiệu<label style={{ color: 'red' }}>*</label></label>
+                                    <div className='col-sm-8'>
+                                        <input className='form-control' name='clip_gioi_thieu' onChange={handleChange} value={value.clip_gioi_thieu} />
                                     </div>
                                 </div>
 
-                                <div className='form-group mt-2'>
-                                    <label>Tiêu đề sự kiện</label>
-                                    <div>
-                                        <input
-                                            className='form-control mt-2'
-                                            name='ten_su_kien'
-                                            onChange={handleChange}
-                                            value={value.ten_su_kien}
-                                        />
+                                <div className='row mb-3'>
+                                    <label className='col-sm-4 col-form-label'>Tiêu đề sự kiện<label style={{ color: 'red' }}>*</label></label>
+                                    <div className='col-sm-8'>
+                                        <input className='form-control' name='ten_su_kien' onChange={handleChange} value={value.ten_su_kien} />
                                     </div>
                                 </div>
 
-                                <div className='form-group mt-2'>
-                                    <label>Loại sự kiện</label>
-                                    <div>
-                                        <select
-                                            className='form-select'
-                                            name='loai_su_kien'
-                                            onChange={handleChange}
-                                            value={value.loai_su_kien}
-                                        >
-                                            <option value='Lễ hội - Vui chơi'>Lễ hội - Vui chơi</option>
-                                            <option value='Văn hóa - Xã hội'>Văn hóa - Xã hội</option>
-                                            <option value='Chính trị'>Chính trị</option>
-                                            <option value='Giáo dục - Thể thao'>Giáo dục - Thể thao</option>
+                                <div className='row mb-3'>
+                                    <label className='col-sm-4 col-form-label'>Lĩnh Vực<label style={{ color: 'red' }}>*</label></label>
+                                    <div className='col-sm-8'>
+                                        <select className='form-select' name='linh_vuc' onChange={handleChange} value={value.linh_vuc}>
+                                            <option value=''>Chọn loại sự kiện</option>
+                                            <option value='Lễ hội truyền thống'>Lễ hội truyền thống</option>
+                                            <option value='Thể thao'>Thể thao</option>
+                                            <option value='Văn hóa - Nghệ thuật'>Văn hóa - Nghệ thuật</option>
+                                            <option value='Chính trị - Ngoại giao'>Chính trị - Ngoại giao</option>
+                                            <option value='Hội thảo chuyên ngành'>Hội thảo chuyên ngành</option>
+                                            <option value='Khác'>Khác</option>
                                         </select>
                                     </div>
                                 </div>
 
-                                <div className='form-group mt-2'>
-                                    <label>Thời gian diễn ra sự kiện</label>
-                                    <div>
+                                <div className='row mb-3'>
+                                    <label className='col-sm-4 col-form-label'>Ngày diễn ra sự kiện<label style={{ color: 'red' }}>*</label></label>
+                                    <div className='col-sm-8'>
                                         <DatePicker
                                             selected={selectedDate}
-                                            onChange={handleDateChange}
+                                            onChange={date => setSelectedDate(date)}
                                             dateFormat="dd/MM/yyyy"
                                             placeholderText="dd/MM/yyyy"
-                                            className='form-control mt-2'
+                                            className='form-control'
                                         />
                                     </div>
                                 </div>
 
-                                <div className='form-group mt-2'>
-                                    <label>Địa điểm tổ chức sự kiện</label>
-                                    <div>
-                                        <input
-                                            className='form-control mt-2'
-                                            name='dia_diem'
-                                            onChange={handleChange}
-                                            value={value.dia_diem}
-                                        />
+                                <div className='row mb-3'>
+                                    <label className='col-sm-4 col-form-label'>Thời gian:</label>
+                                    <div className='col-sm-3'>
+                                        <input className='form-control' name='thoi_gian_dien_ra_su_kien' placeholder="HH:mm - HH:mm" onChange={handleChange} value={value.thoi_gian_dien_ra_su_kien} />
                                     </div>
                                 </div>
 
-                                <div className='form-group mt-2'>
-                                    <label>Mô tả</label>
-                                    <div>
-                                        <textarea
-                                            className='form-control mt-2'
-                                            name='mo_ta'
-                                            onChange={handleChange}
-                                            value={value.mo_ta}
-                                            style={{ height: 300 }}
-                                        />
+                                <div className='row mb-3'>
+                                    <label className='col-sm-4 col-form-label'>Địa điểm tổ chức sự kiện<label style={{ color: 'red' }}>*</label></label>
+                                    <div className='col-sm-8'>
+                                        <input className='form-control' name='dia_diem.dia_chi' onChange={handleChange} value={value.dia_diem.dia_chi} />
+                                    </div>
+                                </div>
+
+                                <div className='row mb-3'>
+                                    <label className='col-sm-4 col-form-label'>Link bản đồ<label style={{ color: 'red' }}>*</label></label>
+                                    <div className='col-sm-8'>
+                                        <input className='form-control' name='dia_diem.link_ban_do' onChange={handleChange} value={value.dia_diem.link_ban_do} />
+                                    </div>
+                                </div>
+
+                                <div className='row mb-3'>
+                                    <label className='col-sm-4 col-form-label'>Loại vé<label style={{ color: 'red' }}>*</label></label>
+                                    <div className='col-sm-3'>
+                                        <select className='form-select' value={ticketType} name='gia_ve.loai_ve' onChange={handleTicketTypeChange}>
+                                            <option value="Miễn phí">Miễn phí</option>
+                                            <option value="Có phí">Có phí</option>
+                                        </select>
+                                    </div>
+                                    {ticketType === 'Có phí' && (
+                                        <div className='col d-flex align-items-center'>
+                                            <label className='col-sm-3 col-form-label mb-0'>Số tiền<label style={{ color: 'red' }}>*</label></label>
+                                            <div>
+                                                <input className='form-control' name='gia_ve.so_tien' onChange={handleChange} value={value.gia_ve.so_tien} />
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className='row mb-3'>
+                                    <label className='col-sm-4 col-form-label'>Nguồn</label>
+                                    <div className='col-sm-8'>
+                                        <input className='form-control' name='nguon' onChange={handleChange} value={value.nguon} />
+                                    </div>
+                                </div>
+
+                                <div className='row mb-3'>
+                                    <label className='col-sm-4 col-form-label'>Tên đơn vị tổ chức</label>
+                                    <div className='col-sm-8'>
+                                        <input className='form-control' name='don_vi_to_chuc.ten' onChange={handleChange} value={value.don_vi_to_chuc.ten} />
+                                    </div>
+                                </div>
+
+                                <div className='row mb-3'>
+                                    <label className='col-sm-4 col-form-label'>Logo đơn vị tổ chức</label>
+                                    <div className='col-sm-8'>
+                                        <input className='form-control' name='don_vi_to_chuc.logo' onChange={handleChange} value={value.don_vi_to_chuc.logo} />
+                                    </div>
+                                </div>
+
+                                <div className='row mb-3'>
+                                    <label className='col-sm-4 col-form-label'>Số điện thoại liên hệ</label>
+                                    <div className='col-sm-8'>
+                                        <input className='form-control' name='don_vi_to_chuc.thong_tin_lien_he.sdt' onChange={handleChange} value={value.don_vi_to_chuc.thong_tin_lien_he.sdt} />
+                                    </div>
+                                </div>
+
+                                <div className='row mb-3'>
+                                    <label className='col-sm-4 col-form-label'>Website đơn vị tổ chức</label>
+                                    <div className='col-sm-8'>
+                                        <input className='form-control' name='don_vi_to_chuc.thong_tin_lien_he.website' onChange={handleChange} value={value.don_vi_to_chuc.thong_tin_lien_he.website} />
+                                    </div>
+                                </div>
+
+                                <div className='row mb-3'>
+                                    <label className='col-sm-4 col-form-label'>Bài viết</label>
+                                    <div className='col-sm-8'>
+                                        <textarea className='form-control' name='bai_viet' onChange={handleChange} value={value.bai_viet} style={{ height: 300 }} />
                                     </div>
                                 </div>
 
